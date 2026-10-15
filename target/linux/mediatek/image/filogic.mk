@@ -1859,7 +1859,7 @@ define Device/glinet_gl-be14000-common
 	kmod-input-touchscreen-cst353x kmod-input-evdev \
 	mt7988-wo-firmware rtl8261c-firmware e2fsprogs f2fsck mkf2fs \
 	kmod-sfp kmod-i2c-gpio
-  DEVICE_PACKAGES += bridger
+  DEVICE_PACKAGES += bridger glinet-panel-ui
 endef
 
 define Device/glinet_gl-be14000

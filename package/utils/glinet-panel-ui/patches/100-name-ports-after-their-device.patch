@@ -1,0 +1,25 @@
+Name LAN ports after their device (lan3 -> "LAN 3", sfp -> "SFP") instead
+of numbering them in bridge order, so the ports page matches the case
+labels on a GL-BE14000 with renamed ports.
+
+--- a/ucode/lib/sampler.uc
++++ b/ucode/lib/sampler.uc
+@@ -600,10 +600,15 @@
+ 	if (type(lan) != 'array')
+ 		lan = network?.lan?.device ? [ network.lan.device ] : [];
+ 
+-	for (let i = 0; i < length(lan); i++)
+-		push(out, { name: length(lan) > 1 ? sprintf('LAN %d', i + 1)
+-						  : 'LAN',
++	/* name ports after their device, so the panel matches the case
++	 * labels (lan3 -> "LAN 3", sfp -> "SFP") whatever the bridge order
++	 */
++	for (let i = 0; i < length(lan); i++) {
++		let m = match(lan[i], /^lan([0-9]+)$/);
++
++		push(out, { name: m ? sprintf('LAN %s', m[1]) : uc(lan[i]),
+ 			    device: lan[i] });
++	}
+ 
+ 	ports_cached = out;
+ 
