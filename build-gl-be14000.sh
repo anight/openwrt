@@ -4,7 +4,8 @@
 # Usage: ./build-gl-be14000.sh [make arguments]
 #
 # Takes the package selection from gl-be14000.diffconfig (Tailscale,
-# conntrack, avahi, full wpad with FreeRADIUS for 802.1X, LuCI with HTTPS,
+# conntrack, mcast-router (mDNS/SSDP relay), full wpad with FreeRADIUS for
+# 802.1X, LuCI with HTTPS,
 # the front panel UI, ...) and builds the image into
 # bin/targets/mediatek/filogic/. Only the vendor-U-Boot image is built
 # (glinet_gl-be14000, not the -ubootmod variant).

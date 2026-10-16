@@ -1,0 +1,20 @@
+#!/bin/sh /etc/rc.common
+# mcast-router: relays mDNS and SSDP between networks by policy.
+# The configuration is written by the access tool ('access apply').
+
+START=60
+USE_PROCD=1
+
+PROG=/usr/sbin/mcast-router
+CONF=/etc/mcast-router.conf
+
+start_service() {
+	procd_open_instance
+	procd_set_param command "$PROG" -c "$CONF"
+	procd_set_param respawn
+	procd_close_instance
+}
+
+reload_service() {
+	procd_send_signal mcast-router '*' HUP
+}
