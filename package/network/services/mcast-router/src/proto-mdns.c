@@ -72,8 +72,9 @@ static void read_name(const uint8_t *d, size_t len, size_t off, char *out, size_
 		if ((l & 0xc0) || off + 1 + l > len)
 			break;
 		for (size_t i = 0; i < l && n + 2 < outlen; i++) {
-			char c = d[off + 1 + i];
-			out[n++] = (c >= 0x20 && c < 0x7f && c != '\t') ? c : '?';
+			uint8_t c = d[off + 1 + i];
+			/* printable ASCII and UTF-8 bytes; no control characters (the records are TSV) */
+			out[n++] = (c >= 0x20 && c != 0x7f) ? c : '?';
 		}
 		if (n + 2 < outlen)
 			out[n++] = '.';

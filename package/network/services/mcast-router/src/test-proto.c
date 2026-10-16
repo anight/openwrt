@@ -77,6 +77,11 @@ static void test_mdns(void)
 	CHECK(run(&mcr_mdns, b, sizeof(mdns_resp), 1234, 1, 0, &p) == MCR_IGNORE, "response not from 5353 ignored");
 	CHECK(run(&mcr_mdns, b, sizeof(mdns_resp), 5353, 0, 1, &p) == MCR_ANSWER, "proxied legacy reply");
 
+	/* UTF-8 in names is kept, control characters are not */
+	uint8_t utf[] = { 0, 0, 0x84, 0, 0, 0, 0, 1, 0, 0, 0, 0,
+		10, 'A', 0xe2, 0x80, 0x99, 's', ' ', 'M', 'a', 'c', '\t', 0, 0, 12, 0, 1, 0, 0, 0, 1, 0, 0 };
+	CHECK(run(&mcr_mdns, utf, sizeof(utf), 5353, 1, 0, &p) == MCR_ANSWER && !strcmp(p.desc, "A\xe2\x80\x99s Mac?"), "utf-8 desc '%s'", p.desc);
+
 	/* compression loop must not hang */
 	uint8_t loop[] = { 0, 0, 0x84, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0xc0, 12, 0, 12, 0, 1, 0, 0, 0, 1, 0, 0 };
 	run(&mcr_mdns, loop, sizeof(loop), 5353, 1, 0, &p);

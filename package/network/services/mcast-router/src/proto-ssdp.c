@@ -47,8 +47,8 @@ static int header(const uint8_t *d, size_t len, const char *name, char *out, siz
 			while (v < e && (d[v] == ' ' || d[v] == '\t'))
 				v++;
 			while (v < e && d[v] != '\r' && n + 1 < outlen) {
-				char c = d[v++];
-				out[n++] = (c >= 0x20 && c < 0x7f && c != '\t') ? c : '?';
+				uint8_t c = d[v++];
+				out[n++] = (c >= 0x20 && c != 0x7f) ? c : '?';
 			}
 			out[n] = 0;
 			return 1;
