@@ -1339,7 +1339,7 @@ void hostapd_ubus_handle_link_measurement(struct hostapd_data *hapd, const u8 *d
 	if (end - pos < 8)
 		return;
 
-	if (!hapd->ubus.obj.has_subscribers)
+	if (!ctx || !hapd->ubus.obj.has_subscribers)
 		return;
 
 	blob_buf_init(&b, 0);
@@ -1828,7 +1828,7 @@ hostapd_ubus_vlan_action(struct hostapd_data *hapd, struct hostapd_vlan *vlan,
 	void *c;
 	int i;
 
-	if (!hapd->ubus.obj.has_subscribers)
+	if (!ctx || !hapd->ubus.obj.has_subscribers)
 		return;
 
 	blob_buf_init(&b, 0);
@@ -1896,7 +1896,7 @@ int hostapd_ubus_handle_event(struct hostapd_data *hapd, struct hostapd_ubus_req
 	if (ban)
 		return WLAN_STATUS_AP_UNABLE_TO_HANDLE_NEW_STA;
 
-	if (!hapd->ubus.obj.has_subscribers)
+	if (!ctx || !hapd->ubus.obj.has_subscribers)
 		return WLAN_STATUS_SUCCESS;
 
 	if (req->type < ARRAY_SIZE(types))
@@ -1971,7 +1971,7 @@ int hostapd_ubus_handle_event(struct hostapd_data *hapd, struct hostapd_ubus_req
 
 void hostapd_ubus_notify(struct hostapd_data *hapd, const char *type, const u8 *addr)
 {
-	if (!hapd->ubus.obj.has_subscribers)
+	if (!ctx || !hapd->ubus.obj.has_subscribers)
 		return;
 
 	if (!addr)
@@ -1987,7 +1987,7 @@ void hostapd_ubus_notify(struct hostapd_data *hapd, const char *type, const u8 *
 void hostapd_ubus_notify_authorized(struct hostapd_data *hapd, struct sta_info *sta,
 				    const char *auth_alg)
 {
-	if (!hapd->ubus.obj.has_subscribers)
+	if (!ctx || !hapd->ubus.obj.has_subscribers)
 		return;
 
 	blob_buf_init(&b, 0);
@@ -2014,7 +2014,7 @@ void hostapd_ubus_notify_beacon_report(
 {
 	char *encoded;
 
-	if (!hapd->ubus.obj.has_subscribers)
+	if (!ctx || !hapd->ubus.obj.has_subscribers)
 		return;
 
 	if (!addr || !rep)
@@ -2089,7 +2089,7 @@ void hostapd_ubus_notify_bss_transition_response(
 #ifdef CONFIG_WNM_AP
 	u16 i;
 
-	if (!hapd->ubus.obj.has_subscribers)
+	if (!ctx || !hapd->ubus.obj.has_subscribers)
 		return;
 
 	if (!addr)
@@ -2118,7 +2118,7 @@ int hostapd_ubus_notify_bss_transition_query(
 	char *cl_str;
 	u16 i;
 
-	if (!hapd->ubus.obj.has_subscribers)
+	if (!ctx || !hapd->ubus.obj.has_subscribers)
 		return 0;
 
 	if (!addr)
@@ -2149,7 +2149,7 @@ int hostapd_ubus_notify_bss_transition_query(
 void hostapd_ubus_notify_apup_newpeer(
 	struct hostapd_data *hapd, const u8 *addr, const char *ifname)
 {
-	if (!hapd->ubus.obj.has_subscribers)
+	if (!ctx || !hapd->ubus.obj.has_subscribers)
 		return;
 
 	blob_buf_init(&b, 0);
@@ -2162,7 +2162,7 @@ void hostapd_ubus_notify_apup_newpeer(
 
 void hostapd_ubus_notify_csa(struct hostapd_data *hapd, int freq)
 {
-	if (!hapd->ubus.obj.has_subscribers)
+	if (!ctx || !hapd->ubus.obj.has_subscribers)
 		return;
 
 	blob_buf_init(&b, 0);
