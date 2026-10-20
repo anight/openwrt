@@ -1,0 +1,167 @@
+From: Andrei Nigmatulin <andrei.nigmatulin@gmail.com>
+Subject: hostapd: WPS: hand out a wpa_psk_file entry's passphrase
+
+Entries of wpa_psk_file marked wps=1 are the WPS credential. hostapd keeps
+only the derived PSK of each entry and hands that out in 64-hex format,
+which some Enrollees (e.g. thermostats with Hi-Flying Wi-Fi modules) cannot
+use. Keep the passphrase of entries given as one and hand it out instead.
+
+With this, a WPS session for one device needs no configuration change: the
+entry is marked wps=1 in the PSK file (re-read in place), and the
+push-button window opened with wps_start.
+
+--- a/src/ap/ap_config.h	2026-10-20 12:37:57.895781201 +0100
++++ b/src/ap/ap_config.h	2026-10-20 12:37:57.938589419 +0100
+@@ -167,6 +167,7 @@
+ 	char keyid[KEYID_LEN];
+ 	int wps;
+ 	u8 psk[PMK_LEN];
++	char passphrase[64]; /* the entry's passphrase, if it was given as one (for WPS) */
+ 	u8 addr[ETH_ALEN];
+ 	u8 p2p_dev_addr[ETH_ALEN];
+ 	int vlan_id;
+--- a/src/ap/ap_config.c	2026-10-20 12:37:57.903479350 +0100
++++ b/src/ap/ap_config.c	2026-10-20 12:37:57.938758600 +0100
+@@ -440,8 +440,11 @@
+ 			ok = 1;
+ 		else if (len >= 8 && len < 64 &&
+ 			 pbkdf2_sha1(pos, ssid->ssid, ssid->ssid_len,
+-				     4096, psk->psk, PMK_LEN) == 0)
++				     4096, psk->psk, PMK_LEN) == 0) {
+ 			ok = 1;
++			/* kept for WPS: entries marked wps=1 hand it out */
++			os_strlcpy(psk->passphrase, pos, sizeof(psk->passphrase));
++		}
+ 		if (!ok) {
+ 			wpa_printf(MSG_ERROR,
+ 				   "Invalid PSK '%s' on line %d in '%s'",
+--- a/src/ap/wps_hostapd.c	2026-10-20 12:37:57.911052822 +0100
++++ b/src/ap/wps_hostapd.c	2026-10-20 12:37:57.940231713 +0100
+@@ -274,12 +274,13 @@
+ 
+ 
+ static int hostapd_wps_lookup_pskfile_cb(void *ctx, const u8 *mac_addr,
+-					 const u8 **psk)
++					 const u8 **psk,
++					 const char **passphrase)
+ {
+ 	const struct hostapd_data *hapd = ctx;
+ 	const struct hostapd_wpa_psk *wpa_psk;
+-	const u8 *any_psk = NULL;
+-	const u8 *dev_psk = NULL;
++	const struct hostapd_wpa_psk *any_psk = NULL;
++	const struct hostapd_wpa_psk *dev_psk = NULL;
+ 
+ 	for (wpa_psk = hapd->conf->ssid.wpa_psk; wpa_psk;
+ 	     wpa_psk = wpa_psk->next) {
+@@ -287,19 +288,22 @@
+ 			continue;
+ 
+ 		if (!any_psk && is_zero_ether_addr(wpa_psk->addr))
+-			any_psk = wpa_psk->psk;
++			any_psk = wpa_psk;
+ 
+ 		if (mac_addr && !dev_psk &&
+ 		    ether_addr_equal(mac_addr, wpa_psk->addr)) {
+-			dev_psk = wpa_psk->psk;
++			dev_psk = wpa_psk;
+ 			break;
+ 		}
+ 	}
+ 
++	*passphrase = NULL;
+ 	if (dev_psk) {
+-		*psk = dev_psk;
++		*psk = dev_psk->psk;
++		*passphrase = dev_psk->passphrase;
+ 	} else if (any_psk) {
+-		*psk = any_psk;
++		*psk = any_psk->psk;
++		*passphrase = any_psk->passphrase;
+ 	} else {
+ 		*psk = NULL;
+ 		wpa_printf(MSG_DEBUG,
+--- a/src/wps/wps.h	2026-10-20 12:37:57.918811185 +0100
++++ b/src/wps/wps.h	2026-10-20 12:37:57.938877916 +0100
+@@ -354,8 +354,11 @@
+ 	 * @ctx: Higher layer context data (cb_ctx)
+ 	 * @addr: Enrollee's MAC address
+ 	 * @psk: Pointer to found PSK (output arg)
++	 * @passphrase: Pointer to the entry's passphrase, or %NULL when it was
++	 *	given as a PSK (output arg)
+ 	 */
+-	int (*lookup_pskfile_cb)(void *ctx, const u8 *mac_addr, const u8 **psk);
++	int (*lookup_pskfile_cb)(void *ctx, const u8 *mac_addr, const u8 **psk,
++				 const char **passphrase);
+ 
+ 	/**
+ 	 * cb_ctx: Higher layer context data for Registrar callbacks
+--- a/src/wps/wps_registrar.c	2026-10-20 12:37:57.926470631 +0100
++++ b/src/wps/wps_registrar.c	2026-10-20 12:37:57.939904119 +0100
+@@ -160,7 +160,8 @@
+ 				 const u8 *pri_dev_type, u16 config_methods,
+ 				 u16 dev_password_id, u8 request_type,
+ 				 const char *dev_name);
+-	int (*lookup_pskfile_cb)(void *ctx, const u8 *mac_addr, const u8 **psk);
++	int (*lookup_pskfile_cb)(void *ctx, const u8 *mac_addr, const u8 **psk,
++				 const char **passphrase);
+ 	void *cb_ctx;
+ 
+ 	struct dl_list pins;
+@@ -1291,11 +1292,11 @@
+ 
+ 
+ static int wps_cp_lookup_pskfile(struct wps_registrar *reg, const u8 *mac_addr,
+-				 const u8 **psk)
++				 const u8 **psk, const char **passphrase)
+ {
+ 	if (!reg->lookup_pskfile_cb)
+ 		return 0;
+-	return reg->lookup_pskfile_cb(reg->cb_ctx, mac_addr, psk);
++	return reg->lookup_pskfile_cb(reg->cb_ctx, mac_addr, psk, passphrase);
+ }
+ 
+ 
+@@ -1620,6 +1621,7 @@
+ 	struct wpabuf *cred;
+ 	struct wps_registrar *reg = wps->wps->registrar;
+ 	const u8 *pskfile_psk;
++	const char *pskfile_passphrase = NULL;
+ 	char hex[65];
+ 
+ 	if (wps->wps->registrar->skip_cred_build)
+@@ -1740,12 +1742,28 @@
+ 				      wps->new_psk, wps->new_psk_len);
+ 		os_memcpy(wps->cred.key, wps->new_psk, wps->new_psk_len);
+ 		wps->cred.key_len = wps->new_psk_len;
+-	} else if (wps_cp_lookup_pskfile(reg, wps->mac_addr_e, &pskfile_psk)) {
+-		wpa_hexdump_key(MSG_DEBUG, "WPS: Use PSK from wpa_psk_file",
+-				pskfile_psk, PMK_LEN);
+-		wpa_snprintf_hex(hex, sizeof(hex), pskfile_psk, PMK_LEN);
+-		os_memcpy(wps->cred.key, hex, PMK_LEN * 2);
+-		wps->cred.key_len = PMK_LEN * 2;
++	} else if (wps_cp_lookup_pskfile(reg, wps->mac_addr_e, &pskfile_psk,
++					 &pskfile_passphrase)) {
++		if (pskfile_passphrase && pskfile_passphrase[0]) {
++			/*
++			 * The entry was given as a passphrase: hand that out,
++			 * as some Enrollees (e.g. Hi-Flying Wi-Fi modules)
++			 * cannot use a Network Key in 64-hex PSK format.
++			 */
++			wpa_printf(MSG_DEBUG,
++				   "WPS: Use passphrase from wpa_psk_file");
++			os_memcpy(wps->cred.key, pskfile_passphrase,
++				  os_strlen(pskfile_passphrase));
++			wps->cred.key_len = os_strlen(pskfile_passphrase);
++		} else {
++			wpa_hexdump_key(MSG_DEBUG,
++					"WPS: Use PSK from wpa_psk_file",
++					pskfile_psk, PMK_LEN);
++			wpa_snprintf_hex(hex, sizeof(hex), pskfile_psk,
++					 PMK_LEN);
++			os_memcpy(wps->cred.key, hex, PMK_LEN * 2);
++			wps->cred.key_len = PMK_LEN * 2;
++		}
+ 	} else if (!wps->wps->registrar->force_per_enrollee_psk &&
+ 		   wps->use_psk_key && wps->wps->psk_set &&
+ 		   !wps->wps->network_key) {
